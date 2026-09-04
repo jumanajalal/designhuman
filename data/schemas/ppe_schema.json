@@ -1,0 +1,24 @@
+{
+  "domain": "PPE",
+  "hero_spec": "Fall-Arrest Safety Harness M/L",
+  "dimensions": {
+    "chestcircumference": {
+      "min": 860,
+      "max": 1140,
+      "unit": "mm",
+      "description": "34in to 45in chest range"
+    },
+    "stature": {
+      "min": 1520,
+      "max": 1850,
+      "unit": "mm",
+      "description": "5ft 0in to 6ft 1in height range"
+    },
+    "weightkg": {
+      "min": 590,
+      "max": 1400,
+      "unit": "0.1kg",
+      "description": "59kg to 140kg body weight"
+    }
+  }
+}
