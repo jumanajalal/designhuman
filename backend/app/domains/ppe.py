@@ -1,37 +1,33 @@
 from __future__ import annotations
+import json
 
-from dataclasses import dataclass
-
-
-@dataclass(frozen=True)
-class ColumnMapping:
-    """Maps a canonical dimension name to a raw dataset column + unit conversion."""
-    raw_column: str
-    raw_unit: str
-    to_canonical_unit: float  # multiply raw value by this to get the canonical unit (cm)
+from app.schemas.design import ConstraintType, DesignSpecification, Domain
 
 
-# TODO: VERIFY against Esha's actual export before the demo. Column names and
-# units below are PLACEHOLDERS — do not trust them until confirmed.
-PPE_COLUMN_MAP: dict[str, ColumnMapping] = {
-    "chest_circumference": ColumnMapping(raw_column="chestcircumference", raw_unit="mm", to_canonical_unit=0.1),
-    "waist_circumference": ColumnMapping(raw_column="waistcircumference", raw_unit="mm", to_canonical_unit=0.1),
-}
-
-
-def normalize_profile(raw_row: dict, column_map: dict[str, ColumnMapping] = PPE_COLUMN_MAP) -> dict[str, float]:
+def load_hero_spec(json_path: str) -> DesignSpecification:
     """
-    Convert one raw dataset row into a canonical profile (dimension -> cm),
-    skipping any dimension whose column is missing/empty for this row.
+    Load Esha's ppe_schema.json (dimension name -> {min, max, unit}) and
+    convert it into our normalized DesignSpecification. Dimension names in
+    her file must match ANSUR II raw column names exactly, since we keep
+    everything in ANSUR's native units end-to-end (mm, 0.1kg) — no unit
+    conversion, no room for conversion bugs.
     """
-    profile: dict[str, float] = {}
-    for canonical_dim, mapping in column_map.items():
-        raw_value = raw_row.get(mapping.raw_column)
-        if raw_value in (None, ""):
-            continue
-        profile[canonical_dim] = float(raw_value) * mapping.to_canonical_unit
-    return profile
+    with open(json_path) as f:
+        raw = json.load(f)
 
+    dimensions = [
+        {
+            "dimension": name,
+            "min_value": bounds["min"],
+            "max_value": bounds["max"],
+            "unit": bounds["unit"],
+            "constraint_type": ConstraintType.RANGE,
+        }
+        for name, bounds in raw["dimensions"].items()
+    ]
 
-def normalize_dataset(raw_rows: list[dict], column_map: dict[str, ColumnMapping] = PPE_COLUMN_MAP) -> list[dict[str, float]]:
-    return [normalize_profile(row, column_map) for row in raw_rows]
+    return DesignSpecification(
+        domain=Domain.PPE,
+        name=raw.get("hero_spec", raw.get("domain", "PPE spec")),
+        dimensions=dimensions,
+    )
