@@ -21,7 +21,10 @@ type AnalysisResult = {
 
   maleCoveragePercent?: number;
   femaleCoveragePercent?: number;
-
+  maleEvaluated?: number;
+malePassing?: number;
+femaleEvaluated?: number;
+femalePassing?: number;
   supportedDimensions?: any[];
   unsupportedDimensions?: any[];
   weakestDimension?: any;
@@ -214,32 +217,45 @@ export default function ResultsDashboard({
           </div>
 
           {/* Gap Analysis */}
-          {result.maleCoveragePercent !== undefined &&
+{result.maleCoveragePercent !== undefined &&
   result.femaleCoveragePercent !== undefined &&
   coverageGap > 0 && (
     <div className="mt-4 space-y-3 rounded-lg bg-slate-800/50 p-4">
       <p className="text-sm text-slate-300">
-        The current specification has an{" "}
+        The current specification has{" "}
         <span className="font-semibold text-white">
           {coverageGap.toFixed(1)} percentage-point
         </span>{" "}
         coverage gap between male and female reference populations.
       </p>
 
-      {result.maleEvaluated && result.malePassing !== undefined && (
-        <p className="text-sm text-slate-400">
-          In real terms:{" "}
-          <span className="font-semibold text-amber-300">
-            1 in {Math.round(result.maleEvaluated / (result.maleEvaluated - result.malePassing))}
-          </span>{" "}
-          men would fall outside this spec, compared to{" "}
-          <span className="font-semibold text-amber-300">
-            1 in {Math.round(result.femaleEvaluated / (result.femaleEvaluated - result.femalePassing))}
-          </span>{" "}
-          women — using {result.maleEvaluated.toLocaleString()} male and{" "}
-          {result.femaleEvaluated.toLocaleString()} female real measured profiles.
-        </p>
-      )}
+      {result.maleEvaluated !== undefined &&
+        result.malePassing !== undefined &&
+        result.femaleEvaluated !== undefined &&
+        result.femalePassing !== undefined && (
+          <p className="text-sm text-slate-400">
+            In real terms:{" "}
+            <span className="font-semibold text-amber-300">
+              1 in{" "}
+              {Math.round(
+                result.maleEvaluated /
+                  (result.maleEvaluated - result.malePassing)
+              )}
+            </span>{" "}
+            men would fall outside this spec, compared to{" "}
+            <span className="font-semibold text-amber-300">
+              1 in{" "}
+              {Math.round(
+                result.femaleEvaluated /
+                  (result.femaleEvaluated - result.femalePassing)
+              )}
+            </span>{" "}
+            women — using{" "}
+            {result.maleEvaluated.toLocaleString()} male and{" "}
+            {result.femaleEvaluated.toLocaleString()} female real measured
+            profiles.
+          </p>
+        )}
     </div>
   )}
         </div>
