@@ -118,7 +118,7 @@ export default function Home() {
                       formData.append("file", file);
 
                       const response = await fetch(
-                        "http://127.0.0.1:8000/coverage/analyze",
+                        "https://designhuman.onrender.com/coverage/analyze",
                         {
                           method: "POST",
                           body: formData,

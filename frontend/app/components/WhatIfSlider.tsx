@@ -51,7 +51,7 @@ export default function WhatIfSlider({
       const newMax = maxValue + currentExpansion;
 
       const res = await fetch(
-        `http://127.0.0.1:8000/coverage/whatif?changed_dimension=${weakestDimension}&new_min=${newMin}&new_max=${newMax}`,
+        `https://designhuman.onrender.com/coverage/whatif?changed_dimension=${weakestDimension}&new_min=${newMin}&new_max=${newMax}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
