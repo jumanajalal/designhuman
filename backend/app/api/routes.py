@@ -89,6 +89,7 @@ async def analyze_pdf(file: UploadFile = File(...)):
     weakest = min(scored, key=lambda d: d["coverage"]) if scored else None
 
     return {
+        "specification": specification.model_dump(),
         "product": parsed.product,
         "domain": "ppe",
         "coveragePercent": round(overall["coverage"] * 100, 2) if overall["coverage"] is not None else None,
