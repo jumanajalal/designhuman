@@ -10,6 +10,8 @@ from app.engine.coverage import joint_coverage
 from app.schemas.design import ConstraintType, DesignSpecification, Domain
 from app.domains.automotive import load_hero_spec as load_automotive_hero_spec
 from app.domains.automotive_loader import load_ansur_profiles as load_automotive_profiles
+from app.domains.automotive import AUTOMOTIVE_COLUMN_MAP
+from app.domains.automotive_loader import load_ansur_profiles as load_automotive_profiles
 
 router = APIRouter(prefix="/coverage", tags=["coverage"])
 
@@ -17,6 +19,10 @@ router = APIRouter(prefix="/coverage", tags=["coverage"])
 # designhuman/
 # ├── backend/
 # └── data/
+DOMAIN_REGISTRY = {
+    Domain.PPE: (PPE_COLUMN_MAP, load_ansur_profiles),
+    Domain.AUTOMOTIVE: (AUTOMOTIVE_COLUMN_MAP, load_automotive_profiles),
+}
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 PPE_SCHEMA_PATH = PROJECT_ROOT / "data" / "schemas" / "ppe_schema.json"
 MALE_DATA_PATH = PROJECT_ROOT / "data" / "ansur_ii_male.csv"
@@ -34,7 +40,6 @@ def compute_joint_coverage(
     """
     return joint_coverage(specification, profiles)
 
-
 @router.post("/analyze")
 async def analyze_pdf(file: UploadFile = File(...)):
     # 1. save + parse
@@ -43,23 +48,32 @@ async def analyze_pdf(file: UploadFile = File(...)):
         tmp_path = tmp.name
 
     parsed = parse_pdf_specification(tmp_path)
+    parsed_names = {d.name for d in parsed.dimensions}
 
-    # 2. split parsed dimensions into supported / unsupported based on
-    #    whether we actually have an ANSUR mapping for them
-    supported_names = set(PPE_COLUMN_MAP.keys())
-    supported_dims = [d for d in parsed.dimensions if d.name in supported_names]
-    unsupported_dims = [d for d in parsed.dimensions if d.name not in supported_names]
+    # 2. figure out which domain this spec actually belongs to, by seeing
+    #    which domain's column map matches the most extracted dimensions
+    best_domain = None
+    best_match_count = 0
+    for domain, (column_map, _loader) in DOMAIN_REGISTRY.items():
+        match_count = len(parsed_names & column_map.keys())
+        if match_count > best_match_count:
+            best_domain = domain
+            best_match_count = match_count
 
-    if not supported_dims:
+    if best_domain is None:
         return {
             "product": parsed.product,
-            "error": "None of the extracted dimensions have a matching anthropometric dataset column.",
-            "unsupportedDimensions": [d.name for d in unsupported_dims],
+            "error": "None of the extracted dimensions match any known domain's reference dataset.",
+            "extractedDimensions": list(parsed_names),
         }
 
-    # 3. build DesignSpecification from only the supported dimensions
+    column_map, load_profiles_fn = DOMAIN_REGISTRY[best_domain]
+    supported_dims = [d for d in parsed.dimensions if d.name in column_map]
+    unsupported_dims = [d for d in parsed.dimensions if d.name not in column_map]
+
+    # 3. build DesignSpecification for the detected domain
     specification = DesignSpecification(
-        domain=Domain.PPE,
+        domain=best_domain,
         name=parsed.product,
         dimensions=[
             {
@@ -73,8 +87,8 @@ async def analyze_pdf(file: UploadFile = File(...)):
         ],
     )
 
-    # 4. load data, compute
-    profiles = load_ansur_profiles(str(MALE_DATA_PATH), str(FEMALE_DATA_PATH), specification)
+    # 4. load data using the detected domain's loader, compute
+    profiles = load_profiles_fn(str(MALE_DATA_PATH), str(FEMALE_DATA_PATH), specification)
     male_profiles = [p for p in profiles if p["sex"] == "male"]
     female_profiles = [p for p in profiles if p["sex"] == "female"]
 
@@ -82,8 +96,6 @@ async def analyze_pdf(file: UploadFile = File(...)):
     male = joint_coverage(specification, male_profiles)
     female = joint_coverage(specification, female_profiles)
 
-    # 5. blind spot = the supported dimension with the lowest coverage
-    #    (skip any dimension with no valid measurements at all)
     per_dim = overall["per_dimension"]
     scored = [d for d in per_dim if d["coverage"] is not None]
     weakest = min(scored, key=lambda d: d["coverage"]) if scored else None
@@ -91,7 +103,7 @@ async def analyze_pdf(file: UploadFile = File(...)):
     return {
         "specification": specification.model_dump(),
         "product": parsed.product,
-        "domain": "ppe",
+        "domain": best_domain.value,
         "coveragePercent": round(overall["coverage"] * 100, 2) if overall["coverage"] is not None else None,
         "evaluated": overall["evaluated"],
         "passing": overall["passing"],
@@ -105,11 +117,10 @@ async def analyze_pdf(file: UploadFile = File(...)):
         "weakestDimension": weakest["dimension"] if weakest else None,
         "supportedDimensions": [d.name for d in supported_dims],
         "unsupportedDimensions": [
-            {"dimension": d.name, "reason": "No matching column in the ANSUR II reference dataset"}
+            {"dimension": d.name, "reason": f"No matching column in the ANSUR II reference dataset for domain '{best_domain.value}'"}
             for d in unsupported_dims
         ],
     }
-
 
 @router.post("/analyze/ppe")
 def analyze_ppe():
