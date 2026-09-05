@@ -49,9 +49,9 @@ export default function WhatIfSlider({
     try {
       const newMin = minValue - currentExpansion;
       const newMax = maxValue + currentExpansion;
-
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
       const res = await fetch(
-        `https://designhuman.onrender.com/coverage/whatif?changed_dimension=${weakestDimension}&new_min=${newMin}&new_max=${newMax}`,
+  `${API_URL}/coverage/whatif?changed_dimension=${weakestDimension}&new_min=${newMin}&new_max=${newMax}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },

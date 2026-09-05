@@ -9,7 +9,7 @@ export default function Home() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [showResults, setShowResults] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<any>(null);
-
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
   return (
     <main className="min-h-screen bg-slate-950 text-white">
       {/* Header */}
@@ -117,9 +117,7 @@ export default function Home() {
                       // Send the actual PDF to the backend
                       formData.append("file", file);
 
-                      const response = await fetch(
-                        "https://designhuman.onrender.com/coverage/analyze",
-                        {
+                      const response = await fetch(`${API_URL}/coverage/analyze`, {
                           method: "POST",
                           body: formData,
                         }
