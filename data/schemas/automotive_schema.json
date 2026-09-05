@@ -1,0 +1,21 @@
+{
+  "domain": "automotive",
+  "name": "Standard Driver Seat Fit",
+  "dimensions": {
+    "sittingheight": {
+      "min": 800,
+      "max": 980,
+      "unit": "mm"
+    },
+    "hipbreadthsitting": {
+      "min": 310,
+      "max": 450,
+      "unit": "mm"
+    },
+    "kneeheightsitting": {
+      "min": 480,
+      "max": 610,
+      "unit": "mm"
+    }
+  }
+}
