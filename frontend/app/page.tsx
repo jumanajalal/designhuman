@@ -142,13 +142,13 @@ export default function Home() {
 
                       console.log("Real backend response:", data);
 
-                      setAnalysisResult({
-                        ...data,
-                        fileName: file.name,
-                        specificationName:
-                          "Fall-Arrest Safety Harness M/L",
-                        domain: "PPE",
-                      });
+                     setAnalysisResult({
+  ...data,
+  fileName: file.name,
+  specificationName:
+    data.product || "Industrial Safety Helmet",
+  domain: data.domain || "PPE",
+});
 
                       setShowResults(true);
                     } catch (error) {
