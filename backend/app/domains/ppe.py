@@ -8,14 +8,13 @@ from app.schemas.design import ConstraintType, DesignSpecification, Domain
 
 @dataclass(frozen=True)
 class ColumnMapping:
-    """Maps a canonical dimension name to a raw dataset column + unit conversion."""
+    """Maps a canonical dimension name to an ANSUR column and unit conversion."""
 
     raw_column: str
     raw_unit: str
     to_canonical_unit: float
 
 
-# TODO: VERIFY against Esha's actual ANSUR export before the demo.
 PPE_COLUMN_MAP: dict[str, ColumnMapping] = {
     "chest_circumference": ColumnMapping(
         raw_column="chestcircumference",
@@ -27,6 +26,31 @@ PPE_COLUMN_MAP: dict[str, ColumnMapping] = {
         raw_unit="mm",
         to_canonical_unit=0.1,
     ),
+    "stature": ColumnMapping(
+        raw_column="stature",
+        raw_unit="mm",
+        to_canonical_unit=0.1,
+    ),
+    "weight_kg": ColumnMapping(
+        raw_column="weightkg",
+        raw_unit="0.1kg",
+        to_canonical_unit=0.1,
+    ),
+    "head_circumference": ColumnMapping(
+        raw_column="headcircumference",
+        raw_unit="mm",
+        to_canonical_unit=0.1,
+    ),
+    "head_length": ColumnMapping(
+        raw_column="headlength",
+        raw_unit="mm",
+        to_canonical_unit=0.1,
+    ),
+    "head_breadth": ColumnMapping(
+        raw_column="headbreadth",
+        raw_unit="mm",
+        to_canonical_unit=0.1,
+    ),
 }
 
 
@@ -34,11 +58,7 @@ def normalize_profile(
     raw_row: dict,
     column_map: dict[str, ColumnMapping] = PPE_COLUMN_MAP,
 ) -> dict[str, float]:
-    """
-    Convert one raw ANSUR row into a canonical profile.
-
-    Missing or empty dimensions are skipped.
-    """
+    """Convert one raw ANSUR row into our canonical profile."""
 
     profile: dict[str, float] = {}
 
@@ -71,16 +91,30 @@ def load_hero_spec(json_path: str) -> DesignSpecification:
     with open(json_path, encoding="utf-8") as f:
         raw = json.load(f)
 
-    dimensions = [
-        {
-            "dimension": name,
-            "min_value": bounds["min"],
-            "max_value": bounds["max"],
-            "unit": bounds["unit"],
-            "constraint_type": ConstraintType.RANGE,
-        }
-        for name, bounds in raw["dimensions"].items()
-    ]
+    # Raw schema names -> canonical backend names.
+    dimension_aliases = {
+        "chestcircumference": "chest_circumference",
+        "stature": "stature",
+        "weightkg": "weight_kg",
+        "headcircumference": "head_circumference",
+"headlength": "head_length",
+"headbreadth": "head_breadth",
+    }
+
+    dimensions = []
+
+    for raw_name, bounds in raw["dimensions"].items():
+        canonical_name = dimension_aliases.get(raw_name, raw_name)
+
+        dimensions.append(
+            {
+                "dimension": canonical_name,
+                "min_value": bounds["min"],
+                "max_value": bounds["max"],
+                "unit": bounds["unit"],
+                "constraint_type": ConstraintType.RANGE,
+            }
+        )
 
     return DesignSpecification(
         domain=Domain.PPE,
