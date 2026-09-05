@@ -8,7 +8,8 @@ from app.domains.ppe import PPE_COLUMN_MAP, load_hero_spec
 from app.domains.ppe_loader import load_ansur_profiles
 from app.engine.coverage import joint_coverage
 from app.schemas.design import ConstraintType, DesignSpecification, Domain
-
+from app.domains.automotive import load_hero_spec as load_automotive_hero_spec
+from app.domains.automotive_loader import load_ansur_profiles as load_automotive_profiles
 
 router = APIRouter(prefix="/coverage", tags=["coverage"])
 
@@ -20,7 +21,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[3]
 PPE_SCHEMA_PATH = PROJECT_ROOT / "data" / "schemas" / "ppe_schema.json"
 MALE_DATA_PATH = PROJECT_ROOT / "data" / "ansur_ii_male.csv"
 FEMALE_DATA_PATH = PROJECT_ROOT / "data" / "ansur_ii_female.csv"
-
+AUTOMOTIVE_SCHEMA_PATH = PROJECT_ROOT / "data" / "schemas" / "automotive_schema.json"
 
 @router.post("/joint")
 def compute_joint_coverage(
@@ -88,6 +89,7 @@ async def analyze_pdf(file: UploadFile = File(...)):
     weakest = min(scored, key=lambda d: d["coverage"]) if scored else None
 
     return {
+        "specification": specification.model_dump(),
         "product": parsed.product,
         "domain": "ppe",
         "coveragePercent": round(overall["coverage"] * 100, 2) if overall["coverage"] is not None else None,
@@ -153,6 +155,36 @@ def analyze_ppe():
         ],
     }
 
+@router.post("/analyze/automotive")
+def analyze_automotive():
+    specification = load_automotive_hero_spec(str(AUTOMOTIVE_SCHEMA_PATH))
+    profiles = load_automotive_profiles(str(MALE_DATA_PATH), str(FEMALE_DATA_PATH), specification)
+
+    male_profiles = [p for p in profiles if p["sex"] == "male"]
+    female_profiles = [p for p in profiles if p["sex"] == "female"]
+
+    overall = joint_coverage(specification, profiles)
+    male = joint_coverage(specification, male_profiles)
+    female = joint_coverage(specification, female_profiles)
+
+    return {
+        "domain": specification.domain.value,
+        "name": specification.name,
+        "coveragePercent": round(overall["coverage"] * 100, 2),
+        "evaluated": overall["evaluated"],
+        "passing": overall["passing"],
+        "maleCoveragePercent": round(male["coverage"] * 100, 2),
+        "femaleCoveragePercent": round(female["coverage"] * 100, 2),
+        "perDimension": [
+            {
+                "dimension": item["dimension"],
+                "evaluated": item["evaluated"],
+                "passing": item["passing"],
+                "coveragePercent": round(item["coverage"] * 100, 2) if item["coverage"] is not None else None,
+            }
+            for item in overall["per_dimension"]
+        ],
+    }
 
 @router.post("/whatif")
 def whatif_coverage(specification: DesignSpecification, changed_dimension: str, new_min: float, new_max: float):
