@@ -1,7 +1,7 @@
 from pathlib import Path
 import tempfile
 
-from fastapi import APIRouter, UploadFile, File
+from fastapi import APIRouter, UploadFile, File, HTTPException
 
 from app.parsers.pdf_spec import parse_pdf_specification
 from app.domains.ppe import PPE_COLUMN_MAP, load_hero_spec
@@ -11,7 +11,6 @@ from app.schemas.design import ConstraintType, DesignSpecification, Domain
 from app.domains.automotive import load_hero_spec as load_automotive_hero_spec
 from app.domains.automotive_loader import load_ansur_profiles as load_automotive_profiles
 from app.domains.automotive import AUTOMOTIVE_COLUMN_MAP
-from app.domains.automotive_loader import load_ansur_profiles as load_automotive_profiles
 
 router = APIRouter(prefix="/coverage", tags=["coverage"])
 
@@ -29,6 +28,7 @@ MALE_DATA_PATH = PROJECT_ROOT / "data" / "ansur_ii_male.csv"
 FEMALE_DATA_PATH = PROJECT_ROOT / "data" / "ansur_ii_female.csv"
 AUTOMOTIVE_SCHEMA_PATH = PROJECT_ROOT / "data" / "schemas" / "automotive_schema.json"
 
+
 @router.post("/joint")
 def compute_joint_coverage(
     specification: DesignSpecification,
@@ -39,6 +39,7 @@ def compute_joint_coverage(
     (dimension name -> measurement), return joint and per-dimension coverage.
     """
     return joint_coverage(specification, profiles)
+
 
 @router.post("/analyze")
 async def analyze_pdf(file: UploadFile = File(...)):
@@ -108,7 +109,11 @@ async def analyze_pdf(file: UploadFile = File(...)):
         "evaluated": overall["evaluated"],
         "passing": overall["passing"],
         "maleCoveragePercent": round(male["coverage"] * 100, 2) if male["coverage"] is not None else None,
+        "maleEvaluated": male["evaluated"],
+        "malePassing": male["passing"],
         "femaleCoveragePercent": round(female["coverage"] * 100, 2) if female["coverage"] is not None else None,
+        "femaleEvaluated": female["evaluated"],
+        "femalePassing": female["passing"],
         "perDimension": [
             {**d, "coveragePercent": round(d["coverage"] * 100, 2), "excludedPercent": round((1 - d["coverage"]) * 100, 2)}
             if d["coverage"] is not None else {**d, "coveragePercent": None, "excludedPercent": None}
@@ -121,6 +126,7 @@ async def analyze_pdf(file: UploadFile = File(...)):
             for d in unsupported_dims
         ],
     }
+
 
 @router.post("/analyze/ppe")
 def analyze_ppe():
@@ -150,7 +156,11 @@ def analyze_ppe():
         "evaluated": overall["evaluated"],
         "passing": overall["passing"],
         "maleCoveragePercent": round(male["coverage"] * 100, 2),
+        "maleEvaluated": male["evaluated"],
+        "malePassing": male["passing"],
         "femaleCoveragePercent": round(female["coverage"] * 100, 2),
+        "femaleEvaluated": female["evaluated"],
+        "femalePassing": female["passing"],
         "perDimension": [
             {
                 "dimension": item["dimension"],
@@ -165,6 +175,7 @@ def analyze_ppe():
             for item in overall["per_dimension"]
         ],
     }
+
 
 @router.post("/analyze/automotive")
 def analyze_automotive():
@@ -185,7 +196,11 @@ def analyze_automotive():
         "evaluated": overall["evaluated"],
         "passing": overall["passing"],
         "maleCoveragePercent": round(male["coverage"] * 100, 2),
+        "maleEvaluated": male["evaluated"],
+        "malePassing": male["passing"],
         "femaleCoveragePercent": round(female["coverage"] * 100, 2),
+        "femaleEvaluated": female["evaluated"],
+        "femalePassing": female["passing"],
         "perDimension": [
             {
                 "dimension": item["dimension"],
@@ -197,10 +212,16 @@ def analyze_automotive():
         ],
     }
 
+
 @router.post("/whatif")
 def whatif_coverage(specification: DesignSpecification, changed_dimension: str, new_min: float, new_max: float):
     """Recompute coverage with one dimension's range modified. Returns before/after."""
-    profiles = load_ansur_profiles(str(MALE_DATA_PATH), str(FEMALE_DATA_PATH), specification)
+    if specification.domain not in DOMAIN_REGISTRY:
+        raise HTTPException(status_code=400, detail=f"Unknown domain: {specification.domain}")
+
+    _column_map, load_profiles_fn = DOMAIN_REGISTRY[specification.domain]
+    profiles = load_profiles_fn(str(MALE_DATA_PATH), str(FEMALE_DATA_PATH), specification)
+
     before = joint_coverage(specification, profiles)
 
     new_dims = [
@@ -216,6 +237,14 @@ def whatif_coverage(specification: DesignSpecification, changed_dimension: str, 
             "min": next(c.min_value for c in specification.dimensions if c.dimension == changed_dimension),
             "max": next(c.max_value for c in specification.dimensions if c.dimension == changed_dimension),
             "coveragePercent": round(before["coverage"] * 100, 2),
+            "evaluated": before["evaluated"],
+            "passing": before["passing"],
         },
-        "after": {"min": new_min, "max": new_max, "coveragePercent": round(after["coverage"] * 100, 2)},
+        "after": {
+            "min": new_min,
+            "max": new_max,
+            "coveragePercent": round(after["coverage"] * 100, 2),
+            "evaluated": after["evaluated"],
+            "passing": after["passing"],
+        },
     }
