@@ -30,6 +30,20 @@ DIMENSION_ALIASES = {
     "weight": "weight_kg",
 }
 
+# Matches any numbered section heading ending in "requirements", e.g.
+# "2. Head and Fit Requirements" or "2. Seating and Fit Requirements" —
+# generalizes across domains instead of hardcoding one literal heading.
+SECTION_HEADER_PATTERN = re.compile(r"^\d+\.\s+.*requirements$", re.IGNORECASE)
+
+# Matches any numbered section heading at all, used to find where the
+# dimensions section ENDS (i.e. the next numbered section, whatever it's
+# called) instead of assuming it's always literally "3. ".
+NUMBERED_SECTION_PATTERN = re.compile(r"^\d+\.\s")
+
+# Accepted units in the dimension table. Add new ones here as new domains
+# introduce new unit types (e.g. "deg" for automotive recline angle).
+ACCEPTED_UNITS = {"mm", "cm", "kg", "0.1kg", "deg"}
+
 
 def extract_pdf_text(pdf_path: str) -> str:
     """Extract all text from a PDF."""
@@ -55,7 +69,9 @@ def canonicalize_dimension(name: str) -> str:
 
 def parse_dimensions(text: str) -> list[ParsedDimension]:
     """
-    Parse the table structure produced by the PPE specification PDF.
+    Parse the table structure produced by a specification PDF, regardless
+    of domain. Finds any numbered section heading ending in "Requirements"
+    and reads its table until the next numbered section begins.
 
     The extracted PDF text looks like:
 
@@ -73,18 +89,20 @@ def parse_dimensions(text: str) -> list[ParsedDimension]:
     try:
         start = next(
             i for i, line in enumerate(lines)
-            if line.lower() == "2. head and fit requirements"
+            if SECTION_HEADER_PATTERN.match(line)
         )
     except StopIteration:
         raise ValueError(
-            "Could not find the Head and Fit Requirements section."
+            "Could not find a dimensional requirements section "
+            "(expected a numbered heading ending in 'Requirements', "
+            "e.g. '2. Head and Fit Requirements')."
         )
 
-    # Stop before the next numbered section.
+    # Stop before the next numbered section, whatever it's called.
     end = len(lines)
 
     for i in range(start + 1, len(lines)):
-        if lines[i].startswith("3. "):
+        if NUMBERED_SECTION_PATTERN.match(lines[i]):
             end = i
             break
 
@@ -121,7 +139,7 @@ def parse_dimensions(text: str) -> list[ParsedDimension]:
             i += 1
             continue
 
-        if unit.lower() not in {"mm", "cm", "kg", "0.1kg"}:
+        if unit.lower() not in ACCEPTED_UNITS:
             i += 1
             continue
 
