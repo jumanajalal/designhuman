@@ -1,0 +1,15 @@
+{
+  "domain": "automotive",
+  "specification": "Standard Driver Seat Fit",
+  "evaluated": 6068,
+  "passing": 5352,
+  "coveragePercent": 88.2,
+  "perDimensionBySex": {
+    "female": {
+      "coveragePercent": 80.21
+    },
+    "male": {
+      "coveragePercent": 92.09
+    }
+  }
+}
